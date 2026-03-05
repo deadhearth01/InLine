@@ -499,11 +499,11 @@ class ChatMessage(Vertical):
                 yield Button("🔄", classes="bubble-action-btn", id=f"regen-{self.msg_index}")
             yield Button("🗑", classes="bubble-action-btn", id=f"del-{self.msg_index}")
 
-    def update_content(self, text: str) -> None:
+    async def update_content(self, text: str) -> None:
         self.content = text
         try:
             md = self.query_one(".bubble-content", Markdown)
-            md.update(text)
+            await md.update(text)
         except NoMatches:
             pass
 
@@ -535,6 +535,13 @@ class ChatTextArea(TextArea):
             if text:
                 self.clear()
                 self.post_message(self.Submit(text))
+            return
+        # Textual marks space as non-printable in some builds;
+        # handle it explicitly so typing spaces always works.
+        if event.key == "space":
+            event.prevent_default()
+            event.stop()
+            self.insert(" ")
             return
         await super()._on_key(event)
 
@@ -1229,10 +1236,10 @@ class InlineApp(App):
                     full_text += "\n\n*[Generation stopped]*"
                     break
                 full_text += chunk
-                assistant_bubble.update_content(full_text + " ▍")
+                await assistant_bubble.update_content(full_text + " ▍")
                 chat_scroll.scroll_end(animate=False)
 
-            assistant_bubble.update_content(full_text or "*[Empty response]*")
+            await assistant_bubble.update_content(full_text or "*[Empty response]*")
             if full_text:
                 self.chat_history.append(Message(role="assistant", content=full_text))
 
@@ -1241,7 +1248,7 @@ class InlineApp(App):
                 f"**❌ Error:** {e}\n\n"
                 "*💡 Tip: Check your API key in ⚙ Settings, or try a different provider.*"
             )
-            assistant_bubble.update_content(error_text)
+            await assistant_bubble.update_content(error_text)
             self.notify(f"Error: {e}", severity="error", timeout=5)
         finally:
             self.is_streaming = False
@@ -1362,6 +1369,10 @@ class InlineApp(App):
     # ── Actions ────────────────────────────────────────────────────────
 
     async def action_new_chat(self) -> None:
+        if self.is_streaming:
+            self._cancel_streaming = True
+            self.is_streaming = False
+            self._show_streaming(False)
         self.chat_history.clear()
         self.msg_counter = 0
         chat_scroll = self.query_one("#chat-scroll", VerticalScroll)
