@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inline-cli"
+version = "0.1.0"
+description = "AI chat in your terminal — mouse-driven, multi-provider, zero browser friction."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "InLine-CLI Contributors" }]
+keywords = ["ai", "terminal", "chat", "cli", "tui", "chatgpt", "claude", "gemini", "ollama"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "textual>=1.0.0",
+    "httpx>=0.27.0",
+    "openai>=1.0.0",
+    "anthropic>=0.40.0",
+    "google-genai>=1.0.0",
+    "groq>=0.11.0",
+    "tomli>=2.0.0;python_version<'3.11'",
+    "tomli-w>=1.0.0",
+    "pyperclip>=1.8.0",
+]
+
+[project.scripts]
+inline = "inline_cli.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/deadhearth01/InLine"
+Repository = "https://github.com/deadhearth01/InLine"
+Issues = "https://github.com/deadhearth01/InLine/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inline_cli"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/inline_cli"]
