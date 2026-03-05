@@ -472,7 +472,12 @@ MarkdownHorizontalRule {
 # ══════════════════════════════════════════════════════════════════════
 
 class ChatMessage(Vertical):
-    """A single chat message bubble with action buttons."""
+    """A single chat message bubble with action buttons.
+
+    During streaming, content is displayed in a lightweight Static widget
+    (no DOM rebuilds). After streaming completes, finalize_content() swaps
+    it for a full Markdown widget so code fences, headings, etc. render.
+    """
 
     can_focus = False
 
@@ -481,29 +486,50 @@ class ChatMessage(Vertical):
         role: str,
         content: str,
         msg_index: int,
+        streaming: bool = False,
         **kwargs: Any,
     ) -> None:
         self.role = role
         self.content = content
         self.msg_index = msg_index
+        self._streaming = streaming
         classes = "user-bubble" if role == "user" else "assistant-bubble"
         super().__init__(classes=classes, **kwargs)
 
     def compose(self) -> ComposeResult:
         icon = "👤  You" if self.role == "user" else "🤖  Assistant"
         yield Label(icon, classes="bubble-header")
-        yield Markdown(self.content, classes="bubble-content")
+        if self._streaming:
+            # Use Static during streaming — .update() is a fast text swap,
+            # no DOM tree rebuild, so it won't corrupt surrounding widgets.
+            yield Static(self.content, classes="bubble-content")
+        else:
+            yield Markdown(self.content, classes="bubble-content")
         with Horizontal(classes="bubble-actions"):
             yield Button("📋", classes="bubble-action-btn", id=f"copy-{self.msg_index}")
             if self.role == "assistant":
                 yield Button("🔄", classes="bubble-action-btn", id=f"regen-{self.msg_index}")
             yield Button("🗑", classes="bubble-action-btn", id=f"del-{self.msg_index}")
 
-    async def update_content(self, text: str) -> None:
+    def update_content(self, text: str) -> None:
+        """Fast content update for streaming — Static.update(), no DOM rebuild."""
         self.content = text
         try:
-            md = self.query_one(".bubble-content", Markdown)
-            await md.update(text)
+            widget = self.query_one(".bubble-content", Static)
+            widget.update(text)
+        except NoMatches:
+            pass
+
+    async def finalize_content(self, text: str) -> None:
+        """Swap the streaming Static for a Markdown widget (one-time DOM build)."""
+        self.content = text
+        self._streaming = False
+        try:
+            old = self.query_one(".bubble-content", Static)
+            actions = self.query_one(".bubble-actions", Horizontal)
+            md = Markdown(text, classes="bubble-content")
+            await self.mount(md, before=actions)
+            old.remove()
         except NoMatches:
             pass
 
@@ -1222,7 +1248,8 @@ class InlineApp(App):
 
         chat_scroll = self.query_one("#chat-scroll", VerticalScroll)
 
-        assistant_bubble = ChatMessage("assistant", "▍", msg_idx, id=f"msg-{msg_idx}")
+        # streaming=True → uses Static (fast text swap, no DOM rebuilds)
+        assistant_bubble = ChatMessage("assistant", "▍", msg_idx, streaming=True, id=f"msg-{msg_idx}")
         await chat_scroll.mount(assistant_bubble)
         chat_scroll.scroll_end(animate=False)
 
@@ -1236,10 +1263,12 @@ class InlineApp(App):
                     full_text += "\n\n*[Generation stopped]*"
                     break
                 full_text += chunk
-                await assistant_bubble.update_content(full_text + " ▍")
+                assistant_bubble.update_content(full_text + " ▍")
                 chat_scroll.scroll_end(animate=False)
 
-            await assistant_bubble.update_content(full_text or "*[Empty response]*")
+            # One-time swap: Static → Markdown for proper rendering
+            final_text = full_text or "*[Empty response]*"
+            await assistant_bubble.finalize_content(final_text)
             if full_text:
                 self.chat_history.append(Message(role="assistant", content=full_text))
 
@@ -1248,7 +1277,7 @@ class InlineApp(App):
                 f"**❌ Error:** {e}\n\n"
                 "*💡 Tip: Check your API key in ⚙ Settings, or try a different provider.*"
             )
-            await assistant_bubble.update_content(error_text)
+            await assistant_bubble.finalize_content(error_text)
             self.notify(f"Error: {e}", severity="error", timeout=5)
         finally:
             self.is_streaming = False
