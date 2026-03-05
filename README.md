@@ -35,6 +35,7 @@ Stop switching to the browser. InLine AI brings a full, polished chat interface 
 - [Configuration](#configuration)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [CLI Reference](#cli-reference)
+- [Troubleshooting](#troubleshooting)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
 - [License](#license)
@@ -65,6 +66,10 @@ Stop switching to the browser. InLine AI brings a full, polished chat interface 
 
 > **Tip:** The default macOS Terminal.app has limited mouse support. [iTerm2](https://iterm2.com/) or [Kitty](https://sw.kovidgoyal.net/kitty/) give the best experience.
 
+> **⚠️ macOS users:** The system Python (`/usr/bin/python3`) is often 3.9 and **will not work**.
+> Install Python 3.10+ via [Homebrew](https://brew.sh/): `brew install python@3.13`
+> Then use `python3.13 -m pip install ...` or create a venv with `python3.13 -m venv .venv`.
+
 ---
 
 ## Installation
@@ -74,6 +79,9 @@ Stop switching to the browser. InLine AI brings a full, polished chat interface 
 Install directly from GitHub — no manual cloning needed:
 
 ```bash
+# Make sure you're using Python 3.10+
+python3 --version   # must be 3.10 or higher
+
 pip install git+https://github.com/deadhearth01/InLine.git
 ```
 
@@ -101,10 +109,14 @@ cd InLine
 **2. Create and activate a virtual environment**
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate        # macOS / Linux
-# .venv\Scripts\activate         # Windows PowerShell
+# Use Python 3.10+ explicitly (important on macOS)
+python3.13 -m venv .venv          # or python3.12, python3.11, python3.10
+source .venv/bin/activate          # macOS / Linux
+# .venv\Scripts\activate           # Windows PowerShell
 ```
+
+> **💡 Tip:** If `python3 --version` shows 3.9, your system Python is too old.
+> Install a newer version first: `brew install python@3.13` (macOS)
 
 **3. Install in editable mode**
 
@@ -285,9 +297,88 @@ Options:
   --provider NAME     Start with a specific provider
                       Options: ollama, openai, anthropic, gemini, groq
   --model NAME        Start with a specific model
+  --debug             Enable verbose debug logging for troubleshooting
+  --diagnostics       Print system info and dependency versions, then exit
   --version           Print version and exit
   -h, --help          Show this help message and exit
 ```
+
+---
+
+## Troubleshooting
+
+### ❌ "requires a different Python" error
+
+```
+ERROR: Package 'inline-cli' requires a different Python: 3.9.6 not in '>=3.10'
+```
+
+You're using the macOS system Python (3.9). InLine AI requires **Python 3.10+**.
+
+**Fix (macOS):**
+```bash
+brew install python@3.13
+python3.13 -m pip install git+https://github.com/deadhearth01/InLine.git
+```
+
+**Fix (Linux):**
+```bash
+sudo apt install python3.13 python3.13-venv   # Debian/Ubuntu
+python3.13 -m pip install git+https://github.com/deadhearth01/InLine.git
+```
+
+**Fix (using a virtual environment):**
+```bash
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install git+https://github.com/deadhearth01/InLine.git
+```
+
+### ❌ InLine crashes on launch
+
+1. Run with debug logging:
+   ```bash
+   inline --debug
+   ```
+2. Print diagnostics (Python version, installed packages, config path):
+   ```bash
+   inline --diagnostics
+   ```
+3. Still stuck? [Open an issue](https://github.com/deadhearth01/InLine/issues) and paste the `--diagnostics` output.
+
+### ❌ Missing dependency errors
+
+If you see `ModuleNotFoundError` or `ImportError`:
+
+```bash
+pip install --force-reinstall git+https://github.com/deadhearth01/InLine.git
+```
+
+### ❌ Space key doesn't work / chat goes blank
+
+Make sure you're on the latest version:
+
+```bash
+pip install --upgrade git+https://github.com/deadhearth01/InLine.git
+```
+
+### ❌ Ollama not detected
+
+Make sure Ollama is running:
+```bash
+ollama serve          # start the server
+ollama list           # verify models are pulled
+inline                # InLine AI will auto-detect it
+```
+
+### ❌ API key not recognized
+
+1. Check the key is set correctly:
+   ```bash
+   echo $OPENAI_API_KEY      # should print your key
+   ```
+2. Or paste it in **⚙ Settings** inside the app and click **🧪 Test** to verify.
+3. Keys are saved at `~/.config/inline-cli/config.toml` — you can edit this file directly.
 
 ---
 
